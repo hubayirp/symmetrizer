@@ -30,6 +30,29 @@ class BasisLayer(torch.nn.Module):
             return out
 
 
+class BasisConvolutionalLayer(torch.nn.Module):
+    """
+    """
+    def forward(self, x):
+        """
+        Normal convolutional forward pass, using weights formed by the basis
+        and corresponding coefficients
+        """
+        self.W = torch.sum(self.basis*self.coeffs, 0)
+
+        self.W = torch.reshape(self.W, [self.channels_out*self.repr_size_out,
+                                        self.channels_in*self.repr_size_in,
+                                        self.fx, self.fy])
+        out = F.conv2d(x, self.W, stride=self.stride, padding=self.padding,
+                       bias=None)
+        if self.has_bias:
+            self.b = torch.sum(self.basis_bias*self.coeffs_bias, 0)
+            self.b = torch.reshape(self.b, [1, self.channels_out*self.repr_size_out, 1, 1])
+            return out + self.b
+        else:
+            return out
+
+
 class BasisLinear(BasisLayer):
     """
     Group-equivariant linear layer
@@ -88,3 +111,73 @@ class BasisLinear(BasisLayer):
         string += f"{self.channels_in}, {self.repr_size_out}, "
         string += f"{self.channels_out}), bias={self.has_bias})"
         return string
+
+
+class BasisConv2d(BasisConvolutionalLayer):
+    """
+    Convolutional layer for groups
+    """
+    def __init__(self, channels_in, channels_out, group, filter_size=(3,3),
+                 bias=True, n_samples=4096, gain_type="he", basis="equivariant",
+                 bias_init=False, stride=1, padding=0, first_layer=False):
+        """
+        """
+        super().__init__()
+
+        self.group = group
+        self.space = basis
+        self.stride = stride
+        self.padding = padding
+        self.channels_in = channels_in
+        self.channels_out = channels_out
+
+        if first_layer:
+            self.repr_size_in = 1
+        else:
+            self.repr_size_in = group.num_elements
+        self.repr_size_out = group.num_elements
+        self.fx, self.fy = filter_size
+
+        ### Getting Basis ###
+        size = [n_samples, self.repr_size_out, self.repr_size_in, self.fx, self.fy]
+        new_size = [1, self.repr_size_out, 1, self.repr_size_in, self.fx, self.fy]
+        basis, self.rank = get_basis(size, group, new_size, space=self.space)
+        self.register_buffer("basis", basis)
+
+        gain = compute_gain(gain_type, self.rank, self.channels_in,
+                            self.channels_out, self.repr_size_in,
+                            self.repr_size_out)
+
+        ### Getting Coefficients ###
+        size = [self.rank, self.channels_out, 1, self.channels_in, 1, 1, 1]
+        self.coeffs = get_coeffs(size, gain)
+
+        ### Getting bias basis and coefficients ###
+        self.has_bias = False
+        if bias:
+            self.has_bias = True
+            size = [n_samples, self.repr_size_out, 1]
+            new_size = [1, self.repr_size_out]
+            basis_bias, self.rank_bias = get_invariant_basis(size, group,
+                                                             new_size,
+                                                             space=self.space)
+            self.register_buffer("basis_bias", basis_bias)
+            if not bias_init:
+                gain = 1.
+            else:
+                gain = compute_gain(gain_type, self.rank_bias,
+                                    self.channels_in, self.channels_out,
+                                    self.repr_size_in, self.repr_size_out)
+            size = [self.rank_bias, self.channels_out, 1]
+            self.coeffs_bias = get_coeffs(size, gain=gain)
+
+
+    def __repr__(self):
+        repr_str = f"{self.space} Conv2d("
+        repr_str += f"{self.repr_size_in}, {self.channels_in}, "
+        repr_str += f"{self.repr_size_out}, {self.channels_out}, "
+        repr_str += f"kernel_size=({self.fx}, {self.fy}), "
+        repr_str += f"stride={self.stride}, "
+        repr_str += f"padding={self.padding},"
+        repr_str += f"bias={self.has_bias})"
+        return repr_str
