@@ -42,7 +42,8 @@ class SingleBasisCartpoleLayer(torch.nn.Module):
 
 
         self.fc1 = BasisLinear(input_size, output_size, group=repr_in,
-                                   basis=basis, gain_type="xavier")
+                               basis=basis, gain_type=gain_type,
+                               bias_init=False)
 
     def forward(self, state):
         """
@@ -70,7 +71,8 @@ class BasisCartpoleLayer(torch.nn.Module):
             repr_out = MatrixRepresentation(in_group, out_group)
 
         self.fc1 = BasisLinear(input_size, output_size, group=repr_out,
-                                   basis=basis, gain_type="xavier")
+                               basis=basis, gain_type=gain_type,
+                               bias_init=False)
 
     def forward(self, state):
         """
@@ -81,7 +83,7 @@ class BasisCartpoleNetwork(torch.nn.Module):
     """
     """
     def __init__(self, repr_in, repr_out, input_size, hidden_sizes,
-                 basis="equivariant"):
+                 basis="equivariant", gain_type="xavier"):
         """
         Construct basis network for cartpole
         """
@@ -91,12 +93,13 @@ class BasisCartpoleNetwork(torch.nn.Module):
             hidden_sizes = [hidden_sizes]
 
         in_out_list = zip(hidden_sizes[:-1], hidden_sizes[1:])
-        input_layer = BasisLinear(input_size, hidden_sizes[0],
-                                      group=repr_in, basis=basis,
-                                      gain_type="xavier")
+        input_layer = BasisLinear(input_size, hidden_sizes[0], group=repr_in,
+                                  basis=basis, gain_type=gain_type,
+                                  bias_init=False)
 
         hidden_layers = [BasisLinear(n_in, n_out, group=repr_out,
-                                         basis=basis)
+                                     gain_type=gain_type, basis=basis,
+                                     bias_init=False)
                          for n_in, n_out in in_out_list]
 
         sequence = list()

@@ -25,7 +25,6 @@ def test_prebuilt_policy():
 
     p_m2 = representations[1].detach().cpu().numpy()
 
-
     t_x = torch.Tensor(x).unsqueeze(0)
     t_p_x1 = torch.Tensor(np.matmul(x, p_m2)).unsqueeze(0)
 
@@ -134,14 +133,14 @@ if __name__ == "__main__":
     print("="*25)
     print("Testing if group is closed..")
     success = test_group()
-    print(success)
+    print("Test passed:", success)
     print("\nTesting single linear layer...")
     success = test_single_layer()
-    print(success)
+    print("Test passed:", success)
     print("\nTesting prebuilt multilayer policy...")
     success = test_prebuilt_policy()
-    print(success)
+    print("Test passed:", success)
     print("\nTesting prebuilt value network...")
     success = test_value_network()
-    print(success)
+    print("Test passed:", success)
     print("="*25)

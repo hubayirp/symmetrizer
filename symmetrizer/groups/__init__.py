@@ -1,1 +1,1 @@
-from .groups import MatrixRepresentation
+from .groups import *
